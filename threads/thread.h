@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
+
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -90,6 +92,8 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t sleep_ticks;
+    struct lock *_lock; 
+    int init_priority;
 
 
     /* Shared between thread.c and synch.c. */
@@ -141,5 +145,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void thread_insert (int64_t);
-void thread_remove ();
+void thread_remove(void);
+
+bool greater_priority(struct list_elem *firstThread, struct list_elem *secondThread, void *aux);
+
 #endif /* threads/thread.h */
