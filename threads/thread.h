@@ -26,6 +26,18 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define fp_t int
+#define P 17
+#define Q 14
+#define F 1<<(Q)
+
+
+
+#define ADD(x, n) (x) + (n) * (F)
+#define INT_NEAR(x) ((x) >= 0 ? ((x) + (F) / 2) / (F) : ((x) - (F) / 2) / (F))
+#define MULPY(x, y) ((int64_t)(x)) * (y) / (F)
+#define DIVIDE(x, y) ((int64_t)(x)) * (F) / (y)
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -94,6 +106,9 @@ struct thread
     int64_t sleep_ticks;
     struct lock *_lock; 
     int init_priority;
+    int recent_cpu;
+    int nice;
+    int status_flag;
 
 
     /* Shared between thread.c and synch.c. */
@@ -146,7 +161,9 @@ int thread_get_load_avg (void);
 
 void thread_insert (int64_t);
 void thread_remove(void);
-
+void update_cur_thread_load_avg(void);
+void recalculate_recent_cpu (void);
+void recalculate_priority (void);
+void calculate_cur_priority(void);
 bool greater_priority(struct list_elem *firstThread, struct list_elem *secondThread, void *aux);
-
 #endif /* threads/thread.h */

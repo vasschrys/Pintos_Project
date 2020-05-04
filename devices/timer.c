@@ -167,12 +167,29 @@ timer_print_stats (void)
 }
 
 /* Timer interrupt handler. */
+//each time a timer_interrupt occurs, if the mlfqs flag is on, then we update the load avg, priority and recent cpu accordingly.
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_remove(); //added this
   thread_tick ();
+  //do this if -mlfqs flag is on 
+  if (thread_mlfqs)
+  {
+    //add 1 to the recent cpu variable on the current thread
+    //Each time a timer interrupt occurs, recent_cpu is incremented by 1 for the running thread only.
+    thread_current ()->recent_cpu = ADD(thread_current ()->recent_cpu, 1);
+    if (ticks % TIMER_FREQ == 0)  //do this for each tick
+      {
+        update_cur_thread_load_avg (); //recalculating the system load avg based on the running thread
+        recalculate_recent_cpu(); //updating recent cpu for all threads in the system
+      }
+    if (ticks % 4 == 3)//check priority for every 4th tick
+    //Every thread has a nice value between -20 and 20 directly under its control. 
+    //Each thread also has a priority, between 0 (PRI_MIN) through 63 (PRI_MAX), which is recalculated using the following formula every fourth tick.
+      recalculate_priority ();
+  }
 
 
 }

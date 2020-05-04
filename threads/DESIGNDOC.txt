@@ -1,0 +1,278 @@
+﻿+--------------------+
+                        |        CS 406      |
+                        |        PINTOS      |
+                        | PROJECT 1: THREADS |
+                        |   DESIGN DOCUMENT  |
+                        +--------------------+
+                                   
+---- GROUP ----
+
+
+>> Fill in the names and email addresses of your group members.
+
+
+Jamie Monteleone <monteljn@lafayette.edu>
+Lia Chrysanthopoulos <chrysanv@lafayette.edu>
+Mei Ting Ieong <ieongm@lafayette.edu>
+Rebecca Pantano <pantanor@lafayette.edu>
+
+
+---- PRELIMINARIES ----
+
+
+>> If you have any preliminary comments on your submission, notes for the instructor, or extra credit, please give them here.
+
+
+Files modified: 
+* thread.c
+* thread.h
+* sync.c
+* sync.h
+* timer.c
+* timer.h
+See A1, B1, and C1 for detailed changes.
+
+
+Tests passed:
+* Alarm-multiple
+* Alarm-negative
+* Alarm-priority
+*  Alarm-simultaneous
+* Alarm-zero
+* Priority-change
+* Priority-condvar
+* Priority-fifo
+* Priority-preempt
+* Priority-sema
+* Mlfqs-load-1
+* Mlfqs-load-60
+* mlfqs-load-avg
+
+
+
+
+
+
+>> Please cite any offline or online sources you consulted while preparing your submission, other than the Pintos documentation, course text, lecture notes, and course staff.
+
+
+
+
+ALARM CLOCK
+===========
+
+
+---- DATA STRUCTURES ----
+
+
+>> A1: Copy here the declaration of each new or changed `struct' or `struct' member, global or static variable, `typedef', or enumeration.  Identify the purpose of each in 25 words or less.
+
+
+
+
+1. int64_t sleep_ticks (Timer.c) 
+* Inside the struct thread, we added a new variable called int64_t sleep_ticks, this will keep track of the sleep ticks that have passed per thread. 
+2. Thread_list (Thread.c)
+* In addition, we added a new list called thread_list in the thread.c file. This list will include all the threads that have been added from the timer_sleep() method. 
+
+
+---- ALGORITHMS ----
+
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),  including the effects of the timer interrupt handler.
+
+
+
+
+In timer_sleep(), we call the new added method thread_insert(ticks), which is in the thread.c file. The method will avoid the busy wait by updating the sleep tick of the current thread. Then, the thread_insert function will push the thread into the new added list and block on the thread until the time has reached. The timer interrupt will call the thread_remove function by checking each element in the thread list and unblocking the threads where their timer_ticks reached the time. The interrupt handler will ensure no outside threads will interrupt the current running process. 
+
+
+
+
+>> A3: What steps are taken to minimize the amount of time spent in the timer interrupt handler?
+
+
+The global list of sleeping threads is ordered by threads with the fastest ‘wake-up’ times to be called first. The time interrupt handler only has to check the head of the list to see if the thread’s wake-up time has been passed. If it has, it must wake up that thread, and traverse through the list, waking up threads until we get to a thread who has a wake up time that has not happened. 
+
+
+---- SYNCHRONIZATION ----
+
+
+>> A4: How are race conditions avoided when multiple threads call timer_sleep() simultaneously?
+
+
+When we traverse through a list, interest into a list, or delete from a list, we disable the interrupts. Therefore, reads and writes are not interrupted. 
+
+
+>> A5: How are race conditions avoided when a timer interrupt occurs during a call to timer_sleep()?
+
+
+In the function timer_sleep() the interrupts are diabled. This means that no race condition occurs between the timer interrupt and the timer_sleep(). 
+
+
+---- RATIONALE ----
+
+
+>> A6: Why did you choose this design?  In what ways is it superior to another design you considered?
+
+
+We chose this design of creating two new methods (thread_insert and thread_remove) so that we can efficiently allow each thread to run and sleep by avoiding the spinning. The two functions will allow us to block and unblock threads when it is appreciated. We decided to pass in the sleep ticks from the thread and update the thread time whenever the function was called. By using the ticks to keep track of time, we are able to suspend the current thread from getting stuck in a loop until the time has reached at least x timer ticks. We did think of making the implementation shorter by combining the two methods. However, we realized that they are called in different places, so making it into two separate functions would be the best approach. 
+
+
+
+
+
+
+
+
+PRIORITY SCHEDULING
+===================
+
+
+---- DATA STRUCTURES ----
+
+
+>> B1: Copy here the declaration of each new or changed `struct' or `struct' member, global or static variable, `typedef', or enumeration.  Identify the purpose of each in 25 words or less.
+Below is information about all modified functions and files as well as which tests passed
+Files modified: 
+* Thread.c
+   * Modified thread_create(), called thread_yield() to add a new thread to the ready list in the correct order (based on priority)
+   * Modified thread_unblock(), call list_insert_ordered() instead of list_push_back() to put the thread back into the ready list in the right order (based on priority)
+   * Modified thread_yeild(), same as with unblock, call list_insert_sorted() instead of list_push_back
+   * Modified thread_set_priority(), if the thread is ready, then needs to be removed and then re added to the ready list based on the updated priority. Also check if it is currently running but isn’t the highest priority then need to call thread_yield so it yields to the CPU and is reentered into the ready list based on priority
+   * Added greater_priority(), a function that compares two threads’ priorities and returns true if the first one has a greater priority than the second (false otherwise).
+* Thread.h
+   * Added the signature of the new function greater_priority()
+* Synch.c
+   * Modified sema_down(), ordered the waiting threads based on priority
+   * Modified sema_up(), sort all waiting threads based on priority so then we can simply unblock by popping from the front 
+   * Modified cond_wait(), again ordering by priority for the waiting threads
+   * Modified cond_signal(), sorting the list by comparing the semaphores with the function we added 
+   * Added compare_sema_priority(), compares the priority of the waiting threads for each of the two semaphores, and returns true if the first has a waiter of a higher priority than the second, false otherwise.
+* Synch.h
+   * Added the signature of the new function compare_sema_priority()
+
+
+
+
+>> B2: Explain the data structure used to track priority donation. Use ASCII art to diagram a nested donation.  (Alternately, submit a .png file.)
+N/A we didn’t implement donation
+
+
+---- ALGORITHMS ----
+
+
+>> B3: How do you ensure that the highest priority thread waiting for a lock, semaphore, or condition variable wakes up first?
+
+
+When inserting a thread into the ready list, instead of using list_push_back, we used the list_insert_sorted function, which inserts the thread into the ready list based on priority. The priority is determined by a function called greater_priority which is passed into the list_insert_sorted function.
+
+
+>> B4: Describe the sequence of events when a call to lock_acquire() causes a priority donation.  How is nested donation handled?
+
+
+N/A we didn’t implement donation
+
+
+>> B5: Describe the sequence of events when lock_release() is called on a lock that a higher-priority thread is waiting for.
+
+
+We did not implement priority donation. However, when lock_release() is called on a lock that a higher-priority thread is waiting for, the priority of the thread holding should be recalculated and then the lock given up.
+
+
+---- SYNCHRONIZATION ----
+
+
+>> B6: Describe a potential race in thread_set_priority() and explain how your implementation avoids it.  Can you use a lock to avoid this race?
+
+
+In thread_set_priority() a thread’s priority is set to the priority passed in, and then it is reordered in the list based on that new priority. If the scheduler switches threads after the priority is updated but before the list ordering is updated, then a race condition occurs. The threads will not actually be ordered in the ready list based off of priority. We avoid this in our implementation by disabling interrupts while these changes happen inside of thread_set_priority. I’m unsure about the effectiveness of a lock in this case.
+
+
+---- RATIONALE ----
+
+
+>> B7: Why did you choose this design?  In what ways is it superior to  another design you considered?
+
+
+This design made the most sense to our group, we went through all of the functions and determined if they would need modifying to implement the scheduling. Initially, we hadn’t discovered list_insert_sorted() in the list.c file, and this was a big help in our design as we really just needed a way to insert into the list based off of priority. 
+
+
+ADVANCED SCHEDULER
+==================
+
+
+---- DATA STRUCTURES ----
+
+
+>> C1: Copy here the declaration of each new or changed `struct' or `struct' member, global or static variable, `typedef', or enumeration.  Identify the purpose of each in 25 words or less.
+
+
+1. static int load_avg
+   1. (thread.c) This the estimate of the average number of threads ready to run over the past minute. It is initialized to zero at system boot. 
+2. int recent_cpu
+   1. (thread.h)  This measures how much CPU time each process has received recently.
+3. int nice
+   1. (thread.h) This is how likely a thread is to give up its own CPU time for another thread
+4. #define ADD(x, n) (x) + (n) * (F)
+#define INT_NEAR(x) ((x) >= 0 ? ((x) + (F) / 2) / (F) : ((x) - (F) / 2) / (F))
+#define MULPY(x, y) ((int64_t)(x)) * (y) / (F)
+#define DIVIDE(x, y) ((int64_t)(x)) * (F) / (y)
+1. (thread.h) These are the operations needed to do fixed point arithmetic.
+
+
+         
+
+
+---- ALGORITHMS ----
+
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each  has a recent_cpu value of 0.  Fill in the table below showing the scheduling decision and the priority and recent_cpu values for each thread after each given number of timer ticks:
+
+
+
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C        A         B       C   to run
+-----    --   --   --         --        --        --   ------
+ 0       0    0   0         63.00 61.00 59.00 A
+ 4       4    0   0         62.00 61.00 59.00 A
+ 8       8    0   0         61.00 61.00 59.00 A
+12    12    0   0         60.00 61.00 59.00 B
+16    12    4   0         60.00 60.00 59.00 B
+20    12    8   0         60.00 59.00 59.00 A 
+24    16    8   0         59.00 59.00 59.00 A
+28    20    8   0         58.00 59.00 59.00 C
+32    20    8   4         58.00 59.00 58.00 B
+36    20  12   4         58.00 58.00 58.00 B
+
+
+>> C3: Did any ambiguities in the scheduler specification make values in the table uncertain?  If so, what rule did you use to resolve them?  Does this match the behavior of your scheduler?
+ 
+Uncertain about whether recent_cpu is updated before or after the priorities. In the table, recent_cpu is updated before the priority. This is the same in our code.
+ 
+>> C4: How is the way you divided the cost of scheduling between code inside and outside interrupt context likely to affect performance?
+
+
+In the interrupt context, we update the load avg, priority, and recent CPU accordingly. The next thread to run is chosen outside of the interrupt context and this might help performance a little as it does not interfere with the scheduler. 
+
+
+
+
+---- RATIONALE ----
+
+
+>> C5: Briefly critique your design, pointing out advantages and disadvantages in your design choices.  If you were to have extra  time to work on this part of the project, how might you choose to refine or improve your design?
+
+
+In general we would have liked to further implement advanced scheduling. We were able to do a general implementation of all aspects of the MLFQ, but ran out of time before we could properly debug some aspects, and therefore ended with only three tests in that section passing. Additionally, if given more time we would have liked to focus on efficiency and getting our OS to run faster, as we noticed many of the tests executed slowly.
+
+
+
+
+
+
+>> C6: The assignment explains arithmetic for fixed-point math in detail, but it leaves it open to you to implement it.  Why did you decide to implement it the way you did?  If you created an abstraction layer for fixed-point math, that is, an abstract data type and/or a set of functions or macros to manipulate fixed-point numbers, why did you do so?  If not, why not?
+
+
+All the numbers we used are in floating point, but pintos does not accept floating point numbers, so we needed to use a conversion algorithm. In the file thread.h we created a bunch of conversions back into real numbers before doing the calculations in floating point numbers. Which seemed for us like the cleanest way to implement this code.
