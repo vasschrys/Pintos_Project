@@ -105,11 +105,6 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
-  // if(t->status == THREAD_READY){
-  //   t->status_flag = 1;
-  // }else{
-  //   t->status_flag = 0;
-  // }
   initial_thread->tid = allocate_tid ();
   load_avg = 0; //initialize load_avg to 0 at the start 
 
@@ -429,14 +424,8 @@ thread_set_priority (int new_priority)
       list_insert_ordered (&ready_list, &thread_current()->elem, greater_priority, NULL);
     }
     //now if it's already running but it doesn't have the highest priority we need to do thread yield so the scheduler can run the correct one
-  else if (thread_current()->status == THREAD_RUNNING){
-    if(list_entry (list_begin (&ready_list),
-                       struct thread,
-                       elem
-                       )->priority > thread_current()->priority
-           ){
-             thread_yield();
-           }
+   else if (thread_current()->status == THREAD_RUNNING){
+      thread_yield();    
   }
         
   intr_set_level (old_level);
@@ -462,8 +451,7 @@ thread_set_nice (int nice UNUSED)
   
   curr->nice = nice; //Sets the current thread's nice value to new_nice
   //recalculate recent_cpu because it is dependent on the new nice value 
-  int loadTemp = 2 * load_avg;
-  thread_current()->recent_cpu = ADD(MULPY (DIVIDE(loadTemp, ADD(loadTemp, 1)), thread_current()->recent_cpu), thread_current()->nice);       
+  thread_current()->recent_cpu = ADD(MULPY (DIVIDE(2 * load_avg, ADD(2 * load_avg, 1)), thread_current()->recent_cpu), thread_current()->nice);       
   calculate_cur_priority(); //Recalculates the thread's priority based on the new value (nice and recent cpu).
 }
 
@@ -507,8 +495,7 @@ recalculate_recent_cpu(void)
   while (temp != list_end (&all_list))
     {
       t = list_entry (temp, struct thread, allelem);
-      int loadTemp = 2 * load_avg;
-      thread_current()->recent_cpu = ADD (MULPY (DIVIDE (loadTemp, ADD (loadTemp, 1)), thread_current()->recent_cpu), thread_current()->nice);      
+      t->recent_cpu = ADD (MULPY (DIVIDE (2 * load_avg, ADD (2 * load_avg, 1)), t->recent_cpu), t->nice);      
       temp = list_next (temp);
     }
 }
